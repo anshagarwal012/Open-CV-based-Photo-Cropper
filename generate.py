@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-def detect_face(image_path):
+def detect_faces(image_path):
     image = cv2.imread(image_path)
     (h, w) = image.shape[:2]
 
@@ -30,43 +30,45 @@ def detect_face(image_path):
     if len(faces) == 0:
         raise ValueError("No faces detected in the image.")
 
-    return faces[0]
+    return faces
 
 def crop_image_to_face(image_path, output_path, desired_width, desired_height, reduce=True):
     try:
-        x, y, w, h = detect_face(image_path)
+        faces = detect_faces(image_path)
     except ValueError as e:
         print(e)
         return
 
     image = Image.open(image_path)
 
-    center_x, center_y = x + w // 2, y + h // 2
+    for i, (x, y, w, h) in enumerate(faces):
+        center_x, center_y = x + w // 2, y + h // 2
 
-    # Ensure a margin around the face
-    margin_w = int(0.6 * w)  # 30% of face width as margin
-    margin_h = int(0.6 * h)  # 30% of face height as margin
+        # Ensure a margin around the face
+        margin_w = int(0.6 * w)  # 60% of face width as margin
+        margin_h = int(0.6 * h)  # 60% of face height as margin
 
-    left = max(center_x - desired_width // 2 - margin_w, 0)
-    upper = max(center_y - desired_height // 2 - margin_h, 0)
-    right = min(center_x + desired_width // 2 + margin_w, image.width)
-    lower = min(center_y + desired_height // 2 + margin_h, image.height)
+        left = max(center_x - desired_width // 2 - margin_w, 0)
+        upper = max(center_y - desired_height // 2 - margin_h, 0)
+        right = min(center_x + desired_width // 2 + margin_w, image.width)
+        lower = min(center_y + desired_height // 2 + margin_h, image.height)
 
-    cropped_image = image.crop((left, upper, right, lower))
+        cropped_image = image.crop((left, upper, right, lower))
 
-    if cropped_image.mode != 'RGB':
-        cropped_image = cropped_image.convert('RGB')
+        if cropped_image.mode != 'RGB':
+            cropped_image = cropped_image.convert('RGB')
 
-    if reduce:
-        cropped_image = cropped_image.resize((desired_width, desired_height), Image.LANCZOS)
+        if reduce:
+            cropped_image = cropped_image.resize((desired_width, desired_height), Image.LANCZOS)
 
-    # Adding white background if the cropped image is smaller than the desired size
-    background = Image.new('RGB', (desired_width, desired_height), (255, 255, 255))
-    offset = ((desired_width - cropped_image.width) // 2, (desired_height - cropped_image.height) // 2)
-    background.paste(cropped_image, offset)
+        # Adding white background if the cropped image is smaller than the desired size
+        background = Image.new('RGB', (desired_width, desired_height), (255, 255, 255))
+        offset = ((desired_width - cropped_image.width) // 2, (desired_height - cropped_image.height) // 2)
+        background.paste(cropped_image, offset)
 
-    background.save(output_path)
-    print(f"Cropped image saved to: {output_path}")
+        face_output_path = os.path.splitext(output_path)[0] + f"_face_{i + 1}.jpg"
+        background.save(face_output_path)
+        print(f"Cropped face {i + 1} saved to: {face_output_path}")
 
 def process_images(input_folder, output_folder, desired_width, desired_height, reduce=True):
     if not os.path.exists(output_folder):
